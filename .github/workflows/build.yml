@@ -1,4 +1,4 @@
-name: Build TG Clean v0.2.0 TEST3 ARM64
+name: Build TG Clean v0.2.0 TEST4 ARM64
 
 on:
   push:
@@ -51,7 +51,7 @@ jobs:
         run: |
           echo "ndk.dir=$ANDROID_SDK_ROOT/ndk/27.0.12077973" > upstream/local.properties
 
-      - name: Apply hardening and TEST3 Cloudflare fallback overlays
+      - name: Apply hardening and TEST4 Telegram fixes
         shell: bash
         run: |
           set -euo pipefail
@@ -61,29 +61,34 @@ jobs:
           python3 tools/patch_v020_tgauto.py upstream
           python3 tools/patch_v020_test2.py upstream
           python3 tools/patch_v020_test3.py upstream
+          python3 tools/patch_v020_test4.py upstream
           python3 tools/patch_v020_compilefix.py upstream
 
           grep -F 'applicationId = "io.github.zsanya322maker.byedpitgclean"' upstream/app/build.gradle.kts
-          grep -F 'versionName = "2.0.0-tgclean-test3"' upstream/app/build.gradle.kts
+          grep -F 'versionCode = 178023' upstream/app/build.gradle.kts
+          grep -F 'versionName = "0.2.0-tgclean-test4"' upstream/app/build.gradle.kts
           grep -F 'APP_ABI := arm64-v8a' upstream/app/src/main/jni/Application.mk
           grep -F 'android:allowBackup="false"' upstream/app/src/main/AndroidManifest.xml
           grep -F 'android.permission.ACCESS_NETWORK_STATE' upstream/app/src/main/AndroidManifest.xml
           grep -F 'android:process=":tg_dpi"' upstream/app/src/main/AndroidManifest.xml
           grep -F 'android:process=":system_probe"' upstream/app/src/main/AndroidManifest.xml
           grep -F 'ProductMode.FULL_AUTO' upstream/app/src/main/java/io/github/romanvht/byedpi/activities/MainActivity.kt
-          grep -F 'Глубокий TG DPI' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/TgAutoEngine.kt
           grep -F 'Cloudflare Worker' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/TgAutoEngine.kt
           grep -F 'odd-cake-197c.omebufufuhekodez.workers.dev' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/TgAutoEngine.kt
-          grep -F 'Глубокий подбор' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/SystemAutoEngine.kt
           grep -F 'path: String = "/apiws"' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
           grep -F 'endpointIdentificationAlgorithm = "HTTPS"' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
           grep -F 'TgRouteKind.CLOUDFLARE_WORKER' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
           grep -F 'path = "/apiws?dc=$dc"' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
-          grep -F 'connectRace(' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
+          grep -F 'if (isMedia) -dc!! else dc!!' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
+          grep -F 'Semaphore(CLIENT_CONCURRENCY_LIMIT)' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
+          grep -F 'target[$kind] atyp=$atyp addr=$addr port=$port' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
+          grep -F 'CLIENT_CONCURRENCY_LIMIT = 64' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
           grep -F 'resetTransportState()' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
           cmp upstream/app/src/main/res/layout/activity_main.xml upstream/app/src/main/res/layout-land/activity_main.xml
+          ! grep -F 'if (isMedia) dc!! else -dc!!' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
           ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|RECEIVE_BOOT_COMPLETED|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' upstream/app/src/main/AndroidManifest.xml
           ! grep -E 'X509TrustManager|checkServerTrusted|trustAll' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
+          ! grep -F 'directPassthrough(c, input, output, addr, port)' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
           ! grep -F 'directTcpFallback(c, input, output, addr, port, init)' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
 
       - name: Build debug and unsigned release APKs
@@ -98,7 +103,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TG-Clean-v0.2.0-TEST3-gradle-build-log
+          name: TG-Clean-v0.2.0-TEST4-gradle-build-log
           path: gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -115,20 +120,20 @@ jobs:
           test -n "$DEBUG_APK"
           test -n "$RELEASE_APK"
 
-          cp "$DEBUG_APK" dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-debug.apk
-          "$BT/zipalign" -p -f 4 "$RELEASE_APK" dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-release-unsigned-aligned.apk
-          "$BT/zipalign" -c -p 4 dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-release-unsigned-aligned.apk
+          cp "$DEBUG_APK" dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-debug.apk
+          "$BT/zipalign" -p -f 4 "$RELEASE_APK" dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-release-unsigned-aligned.apk
+          "$BT/zipalign" -c -p 4 dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-release-unsigned-aligned.apk
 
-          "$BT/apksigner" verify --verbose --print-certs dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-debug.apk
-          "$BT/aapt" dump badging dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-debug.apk | tee dist/APK_BADGING.txt
-          "$BT/aapt" dump permissions dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-debug.apk | tee dist/APK_PERMISSIONS.txt
+          "$BT/apksigner" verify --verbose --print-certs dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-debug.apk
+          "$BT/aapt" dump badging dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-debug.apk | tee dist/APK_BADGING.txt
+          "$BT/aapt" dump permissions dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-debug.apk | tee dist/APK_PERMISSIONS.txt
 
           grep -F "package: name='io.github.zsanya322maker.byedpitgclean'" dist/APK_BADGING.txt
-          grep -F "versionName='2.0.0-tgclean-test3'" dist/APK_BADGING.txt
+          grep -F "versionName='0.2.0-tgclean-test4'" dist/APK_BADGING.txt
           grep -F 'android.permission.ACCESS_NETWORK_STATE' dist/APK_PERMISSIONS.txt
           ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|RECEIVE_BOOT_COMPLETED|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' dist/APK_PERMISSIONS.txt
 
-          unzip -l dist/TG-Clean-v0.2.0-TEST3-arm64-v8a-debug.apk | tee dist/APK_CONTENTS.txt
+          unzip -l dist/TG-Clean-v0.2.0-TEST4-arm64-v8a-debug.apk | tee dist/APK_CONTENTS.txt
           ! grep -E 'lib/(armeabi-v7a|x86|x86_64)/' dist/APK_CONTENTS.txt
           grep -F 'lib/arm64-v8a/libbyedpi.so' dist/APK_CONTENTS.txt
           grep -F 'lib/arm64-v8a/libhev-socks5-tunnel.so' dist/APK_CONTENTS.txt
@@ -136,10 +141,10 @@ jobs:
           sha256sum dist/*.apk | tee dist/SHA256SUMS.txt
           ls -lh dist/
 
-      - name: Upload TEST3 artifact
+      - name: Upload TEST4 artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TG-Clean-v0.2.0-TEST3-arm64-v8a
+          name: TG-Clean-v0.2.0-TEST4-arm64-v8a
           path: dist/
           if-no-files-found: error
           retention-days: 30
