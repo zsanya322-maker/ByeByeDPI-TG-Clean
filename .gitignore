@@ -1,0 +1,7 @@
+# Local build/checkouts
+upstream/
+dist/
+*.apk
+*.jks
+*.keystore
+local.properties
