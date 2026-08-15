@@ -59,6 +59,7 @@ jobs:
           python3 tools/patch_v011_final.py upstream
           python3 tools/patch_v020.py upstream
           python3 tools/patch_v020_tgauto.py upstream
+          python3 tools/patch_v020_compilefix.py upstream
 
           grep -F 'applicationId = "io.github.zsanya322maker.byedpitgclean"' upstream/app/build.gradle.kts
           grep -F 'APP_ABI := arm64-v8a' upstream/app/src/main/jni/Application.mk
@@ -70,6 +71,7 @@ jobs:
           grep -F 'upstreamSocksPort' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
           grep -F 'connectRace(' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
           grep -F 'resetTransportState()' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
+          cmp upstream/app/src/main/res/layout/activity_main.xml upstream/app/src/main/res/layout-land/activity_main.xml
           ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|RECEIVE_BOOT_COMPLETED|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' upstream/app/src/main/AndroidManifest.xml
           ! grep -E 'X509TrustManager|checkServerTrusted|trustAll' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
           ! grep -F 'directTcpFallback(c, input, output, addr, port, init)' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
