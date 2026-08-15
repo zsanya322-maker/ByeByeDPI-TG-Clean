@@ -20,16 +20,14 @@ class TgCleanController {
             host = "127.0.0.1",
             listenPort = PORT,
             routeProvider = { engine.currentRoute() },
-            onRouteStatus = { mode ->
-                Log.d(TAG, "Telegram route=$mode")
-            },
+            onRouteStatus = { mode -> Log.d(TAG, "Telegram route=$mode") },
             onStats = { stats ->
                 TgCleanRuntime.stats = stats
                 Log.d(TAG, stats)
             },
         )
 
-        engine = TgAutoEngine(dpiProcess) { route ->
+        engine = TgAutoEngine(appContext, dpiProcess) { route ->
             TgCleanRuntime.route = route.id
             TgCleanRuntime.routeLabel = route.label
             TgCleanRuntime.routeLatencyMs = route.latencyMs
@@ -68,13 +66,10 @@ class TgCleanController {
         networkMonitor?.stop()
         networkMonitor = null
 
-        val engine = autoEngine
-        autoEngine = null
-        if (engine != null) {
-            kotlinx.coroutines.runBlocking {
-                runCatching { engine.shutdown() }
-            }
+        autoEngine?.let { engine ->
+            kotlinx.coroutines.runBlocking { runCatching { engine.shutdown() } }
         }
+        autoEngine = null
 
         val current = server
         server = null
@@ -86,6 +81,8 @@ class TgCleanController {
         TgCleanRuntime.routeLabel = "—"
         TgCleanRuntime.routeLatencyMs = null
         TgCleanRuntime.probeSummary = ""
+        TgCleanRuntime.tgProbePhase = ""
+        TgCleanRuntime.tgProbeProgress = ""
     }
 
     companion object {
