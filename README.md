@@ -20,12 +20,12 @@ Android build based on **ByeByeDPI 1.7.8** with a local Telegram MTProto-over-We
 - The local `127.0.0.1:1082` SOCKS server is Telegram-only: non-Telegram destinations are rejected instead of acting as a generic local SOCKS proxy.
 - SOCKS5 method negotiation verifies that the client actually offered no-auth before selecting it.
 - Removes `MANAGE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` and legacy external-storage mode. File import/export uses Android's system document picker (SAF).
+- Removes `QUERY_ALL_PACKAGES`. Per-app selection uses least-privilege package visibility for normal launcher and Android TV launcher apps through manifest `<queries>` declarations instead of visibility into every installed package.
 - Disables Android app-data backup for this fork (`allowBackup=false`).
 - `SettingsActivity` is not exported.
 - Exported shortcut control via `ToggleActivity` is guarded by a per-install random token so arbitrary third-party intents cannot start/stop the service or replace the strategy.
 - Service status broadcasts are package-local.
 - GitHub Actions used by the build are pinned to exact commit SHAs.
-- `QUERY_ALL_PACKAGES` is intentionally retained because the upstream per-app VPN whitelist/blacklist UI enumerates installed applications.
 
 ## Telegram setup
 
@@ -40,7 +40,7 @@ The current version deliberately keeps Telegram UI minimal so transport behavior
 
 ## Build model
 
-The repository does not vendor a stale full copy of ByeByeDPI. GitHub Actions checks out the exact pinned upstream source and submodules, then applies the project patches. `tools/patch.py` contains the original v0.1.0 integration and `tools/patch_v011.py` applies the v0.1.1 security overlay. CI builds and audits the resulting APK.
+The repository does not vendor a stale full copy of ByeByeDPI. GitHub Actions checks out the exact pinned upstream source and submodules, then applies the project patches. `tools/patch.py` contains the original v0.1.0 integration, `tools/patch_v011.py` applies the main v0.1.1 security overlay, and `tools/patch_v011_final.py` applies the final least-privilege manifest overlay. CI builds and audits the resulting APK.
 
 ## Release signing identity
 
