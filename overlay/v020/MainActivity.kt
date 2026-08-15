@@ -13,33 +13,46 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.view.WindowManager
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.lifecycle.lifecycleScope
 import io.github.romanvht.byedpi.BuildConfig
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.data.*
 import io.github.romanvht.byedpi.databinding.ActivityMainBinding
+import io.github.romanvht.byedpi.ewenloy.tgws.SystemAutoEngine
 import io.github.romanvht.byedpi.ewenloy.tgws.TgCleanRuntime
+import io.github.romanvht.byedpi.ewenloy.tgws.TgNetworkMonitor
 import io.github.romanvht.byedpi.services.ServiceManager
 import io.github.romanvht.byedpi.services.appStatus
 import io.github.romanvht.byedpi.utility.ClipboardUtils
 import io.github.romanvht.byedpi.utility.getCmdArgs
 import io.github.romanvht.byedpi.utility.getPreferences
-import io.github.romanvht.byedpi.utility.mode
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class MainActivity : BaseActivity() {
     private lateinit var binding: ActivityMainBinding
     private val prefs by lazy { getPreferences() }
     private val handler = Handler(Looper.getMainLooper())
+    private var systemAutoJob: Job? = null
+
+    private enum class ProductMode(val key: String) {
+        TELEGRAM("telegram_auto"),
+        VPN("vpn_strategy"),
+        FULL_AUTO("full_auto"),
+    }
 
     private val ticker = object : Runnable {
         override fun run() {
-            updateRuntimeCard()
-            handler.postDelayed(this, 1000)
+            updateUi()
+            handler.postDelayed(this, 800)
         }
     }
 
@@ -70,10 +83,10 @@ class MainActivity : BaseActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        if (!prefs.contains("tgclean_v020_initialized")) {
+        if (!prefs.contains(PREF_PRODUCT_MODE)) {
             prefs.edit(commit = true) {
+                putString(PREF_PRODUCT_MODE, ProductMode.TELEGRAM.key)
                 putString("byedpi_mode", "proxy")
-                putBoolean("tgclean_v020_initialized", true)
             }
         }
 
@@ -84,22 +97,43 @@ class MainActivity : BaseActivity() {
         }
         ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
-        binding.modeToggle.check(if (prefs.mode() == Mode.VPN) R.id.mode_vpn else R.id.mode_telegram)
         binding.modeToggle.addOnButtonCheckedListener { _, checkedId, checked ->
-            if (!checked || appStatus.first == AppStatus.Running) return@addOnButtonCheckedListener
-            prefs.edit { putString("byedpi_mode", if (checkedId == R.id.mode_vpn) "vpn" else "proxy") }
+            if (!checked || appStatus.first == AppStatus.Running || TgCleanRuntime.systemAutoRunning) {
+                return@addOnButtonCheckedListener
+            }
+            val mode = when (checkedId) {
+                R.id.mode_vpn -> ProductMode.VPN
+                R.id.mode_full_auto -> ProductMode.FULL_AUTO
+                else -> ProductMode.TELEGRAM
+            }
+            saveProductMode(mode)
             updateUi()
         }
 
         binding.powerButton.setOnClickListener {
-            if (appStatus.first == AppStatus.Running) ServiceManager.stop(this) else startWithNotificationPermission()
+            if (systemAutoJob?.isActive == true) {
+                systemAutoJob?.cancel()
+                Toast.makeText(this, "Подбор отменяется…", Toast.LENGTH_SHORT).show()
+            } else if (appStatus.first == AppStatus.Running) {
+                ServiceManager.stop(this)
+            } else {
+                startWithNotificationPermission()
+            }
         }
+
         binding.setupTelegramButton.setOnClickListener { openTelegramProxySetup() }
         binding.copyProxyButton.setOnClickListener {
             ClipboardUtils.copy(this, "127.0.0.1:1082", "TG Clean SOCKS5")
             Toast.makeText(this, "127.0.0.1:1082 скопирован", Toast.LENGTH_SHORT).show()
         }
         binding.editStrategyButton.setOnClickListener { showStrategyDialog() }
+        binding.systemAutoButton.setOnClickListener {
+            if (appStatus.first == AppStatus.Running) {
+                Toast.makeText(this, "Сначала останови сервис", Toast.LENGTH_SHORT).show()
+            } else {
+                runSystemAuto(startVpnAfter = false)
+            }
+        }
         binding.instructionsButton.setOnClickListener { showInstructions() }
         binding.diagnosticsButton.setOnClickListener { showDiagnostics() }
 
@@ -119,8 +153,25 @@ class MainActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(ticker)
+        systemAutoJob?.cancel()
         runCatching { unregisterReceiver(receiver) }
         super.onDestroy()
+    }
+
+    private fun productMode(): ProductMode {
+        return when (prefs.getString(PREF_PRODUCT_MODE, ProductMode.TELEGRAM.key)) {
+            ProductMode.VPN.key -> ProductMode.VPN
+            ProductMode.FULL_AUTO.key -> ProductMode.FULL_AUTO
+            else -> ProductMode.TELEGRAM
+        }
+    }
+
+    private fun saveProductMode(mode: ProductMode) {
+        prefs.edit(commit = true) {
+            putString(PREF_PRODUCT_MODE, mode.key)
+            putString("byedpi_mode", if (mode == ProductMode.TELEGRAM) "proxy" else "vpn")
+        }
     }
 
     private fun startWithNotificationPermission() {
@@ -133,55 +184,145 @@ class MainActivity : BaseActivity() {
     }
 
     private fun startInternal() {
-        when (prefs.mode()) {
-            Mode.Proxy -> ServiceManager.start(this, Mode.Proxy)
-            Mode.VPN -> {
-                val prepare = VpnService.prepare(this)
-                if (prepare != null) vpnPermission.launch(prepare) else ServiceManager.start(this, Mode.VPN)
+        when (productMode()) {
+            ProductMode.TELEGRAM -> ServiceManager.start(this, Mode.Proxy)
+            ProductMode.VPN -> requestVpnAndStart()
+            ProductMode.FULL_AUTO -> runSystemAuto(startVpnAfter = true)
+        }
+    }
+
+    private fun requestVpnAndStart() {
+        val prepare = VpnService.prepare(this)
+        if (prepare != null) vpnPermission.launch(prepare) else ServiceManager.start(this, Mode.VPN)
+    }
+
+    private fun runSystemAuto(startVpnAfter: Boolean) {
+        if (systemAutoJob?.isActive == true) return
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        val monitor = TgNetworkMonitor(this) { }
+        val snapshot = monitor.currentSnapshot()
+        TgCleanRuntime.networkType = snapshot.type
+        TgCleanRuntime.systemAutoError = null
+
+        systemAutoJob = lifecycleScope.launch {
+            try {
+                val selection = SystemAutoEngine(this@MainActivity).select()
+                if (selection == null) {
+                    Toast.makeText(this@MainActivity, "System Auto не нашёл рабочую стратегию", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                prefs.edit(commit = true) {
+                    putBoolean("byedpi_enable_cmd_settings", true)
+                    putString("byedpi_cmd_args", selection.strategy)
+                }
+                Toast.makeText(
+                    this@MainActivity,
+                    "System Auto: стратегия #${selection.index}, ${selection.score}/${selection.total}",
+                    Toast.LENGTH_SHORT,
+                ).show()
+
+                if (startVpnAfter) requestVpnAndStart()
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                TgCleanRuntime.systemAutoError = "Подбор отменён"
+            } catch (e: Exception) {
+                TgCleanRuntime.systemAutoError = "${e.javaClass.simpleName}: ${e.message ?: "error"}"
+                Toast.makeText(this@MainActivity, "Ошибка System Auto", Toast.LENGTH_LONG).show()
+            } finally {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                systemAutoJob = null
+                updateUi()
             }
         }
     }
 
     private fun updateUi() {
         val running = appStatus.first == AppStatus.Running
-        val mode = prefs.mode()
+        val scanning = systemAutoJob?.isActive == true || TgCleanRuntime.systemAutoRunning
+        val mode = productMode()
 
-        binding.modeTelegram.isEnabled = !running
-        binding.modeVpn.isEnabled = !running
-        val wanted = if (mode == Mode.VPN) R.id.mode_vpn else R.id.mode_telegram
+        binding.modeTelegram.isEnabled = !running && !scanning
+        binding.modeVpn.isEnabled = !running && !scanning
+        binding.modeFullAuto.isEnabled = !running && !scanning
+
+        val wanted = when (mode) {
+            ProductMode.TELEGRAM -> R.id.mode_telegram
+            ProductMode.VPN -> R.id.mode_vpn
+            ProductMode.FULL_AUTO -> R.id.mode_full_auto
+        }
         if (binding.modeToggle.checkedButtonId != wanted) binding.modeToggle.check(wanted)
 
-        binding.powerButton.text = if (running) "Остановить" else "Запустить"
-        binding.statusTitle.text = if (running) "Работает" else "Остановлено"
+        binding.powerButton.text = when {
+            scanning -> "Отменить подбор"
+            running -> "Остановить"
+            else -> "Запустить"
+        }
+        binding.statusTitle.text = when {
+            scanning -> "Подбираем DPI"
+            running -> "Работает"
+            else -> "Остановлено"
+        }
         binding.statusSubtitle.text = when {
-            running && mode == Mode.Proxy -> "Telegram защищён через локальный WSS-транспорт"
-            running && mode == Mode.VPN -> "Telegram + системный обход включены"
-            mode == Mode.Proxy -> "Рекомендуемый режим для Telegram"
-            else -> "Системный VPN зависит от выбранной DPI-стратегии"
+            scanning -> "${TgCleanRuntime.systemAutoPhase} ${TgCleanRuntime.systemAutoProgress}".trim()
+            running && mode == ProductMode.TELEGRAM -> "Telegram Auto подбирает лучший маршрут для текущей сети"
+            running && mode == ProductMode.VPN -> "Telegram Auto + выбранная системная DPI-стратегия"
+            running && mode == ProductMode.FULL_AUTO -> "Telegram Auto + System Auto"
+            mode == ProductMode.TELEGRAM -> "Только Telegram, без Android VPN"
+            mode == ProductMode.VPN -> "Системный VPN с выбранной стратегией + TG Auto"
+            else -> "Автоподбор Telegram и системного DPI независимо"
         }
         binding.statusDot.backgroundTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(this, if (running) R.color.tgclean_green else R.color.tgclean_muted)
+            ContextCompat.getColor(
+                this,
+                when {
+                    running -> R.color.tgclean_green
+                    scanning -> R.color.tgclean_primary
+                    else -> R.color.tgclean_muted
+                },
+            ),
         )
-        binding.modeDescription.text = if (mode == Mode.Proxy) {
-            "Только Telegram • стратегии ByeDPI не влияют на 127.0.0.1:1082"
-        } else {
-            "Telegram + весь телефон • сайты вроде YouTube зависят от DPI-стратегии и сети"
+
+        binding.modeDescription.text = when (mode) {
+            ProductMode.TELEGRAM -> "TG Auto: Direct WSS → 12 быстрых DPI → полный список стратегий."
+            ProductMode.VPN -> "TG Auto работает отдельно; системный VPN использует выбранную ниже стратегию."
+            ProductMode.FULL_AUTO -> "TG Auto и System Auto подбирают две независимые стратегии для текущей сети."
         }
-        binding.vpnCard.visibility = if (mode == Mode.VPN) android.view.View.VISIBLE else android.view.View.GONE
+
+        binding.vpnCard.visibility = if (mode == ProductMode.TELEGRAM) View.GONE else View.VISIBLE
+        binding.editStrategyButton.visibility = if (mode == ProductMode.VPN) View.VISIBLE else View.GONE
+        binding.systemAutoButton.visibility = if (mode == ProductMode.TELEGRAM) View.GONE else View.VISIBLE
+        binding.systemAutoButton.isEnabled = !running && !scanning
         binding.strategyValue.text = prefs.getCmdArgs()
+        updateSystemAutoUi(mode)
         updateRuntimeCard()
+    }
+
+    private fun updateSystemAutoUi(mode: ProductMode) {
+        binding.systemAutoStatus.text = when {
+            TgCleanRuntime.systemAutoRunning ->
+                "${TgCleanRuntime.systemAutoPhase} • ${TgCleanRuntime.systemAutoProgress}".trim()
+            TgCleanRuntime.systemStrategyIndex != null ->
+                "System Auto #${TgCleanRuntime.systemStrategyIndex} • ${TgCleanRuntime.systemScore}"
+            mode == ProductMode.VPN -> "Ручная стратегия. Кнопкой «Подобрать» можно заменить её автоматически."
+            else -> "При запуске Full Auto сначала проверит YouTube/API/GoogleVideo и выберет стратегию."
+        }
+        binding.systemAutoButton.text = if (TgCleanRuntime.systemStrategyIndex == null) "Подобрать" else "Переподобрать"
     }
 
     private fun updateRuntimeCard() {
         val running = appStatus.first == AppStatus.Running && TgCleanRuntime.running
         binding.tgProxyStatus.text = if (running) "127.0.0.1:1082  •  готов" else "127.0.0.1:1082  •  остановлен"
-        val routeText = when (TgCleanRuntime.route) {
-            "ws" -> "Маршрут: WSS"
-            "direct" -> "Маршрут: прямой fallback"
-            "warming" -> "Маршрут: прогрев соединений…"
-            else -> "Маршрут: —"
+        binding.routeStatus.text = when {
+            !running -> "Маршрут: —"
+            TgCleanRuntime.route == "probing" ->
+                "TG Auto: ${TgCleanRuntime.tgProbePhase} ${TgCleanRuntime.tgProbeProgress}".trim()
+            TgCleanRuntime.route == "failed" -> "TG Auto: маршрут не найден"
+            else -> buildString {
+                append("TG: ").append(TgCleanRuntime.routeLabel)
+                TgCleanRuntime.routeLatencyMs?.let { append(" • ").append(it).append(" мс") }
+            }
         }
-        binding.routeStatus.text = routeText
     }
 
     private fun openTelegramProxySetup() {
@@ -192,8 +333,8 @@ class MainActivity : BaseActivity() {
     }
 
     private fun showStrategyDialog() {
-        if (appStatus.first == AppStatus.Running) {
-            Toast.makeText(this, "Сначала останови сервис", Toast.LENGTH_SHORT).show()
+        if (appStatus.first == AppStatus.Running || systemAutoJob?.isActive == true) {
+            Toast.makeText(this, "Сначала останови сервис/подбор", Toast.LENGTH_SHORT).show()
             return
         }
         val input = EditText(this).apply {
@@ -202,8 +343,8 @@ class MainActivity : BaseActivity() {
             setPadding(48, 24, 48, 24)
         }
         val dialog = AlertDialog.Builder(this)
-            .setTitle("DPI-стратегия")
-            .setMessage("Нужна только для системного VPN. На Telegram-прокси 1082 не влияет.")
+            .setTitle("Системная DPI-стратегия")
+            .setMessage("Используется системным VPN. Telegram Auto подбирается отдельно.")
             .setView(input)
             .setPositiveButton("Сохранить", null)
             .setNeutralButton("По умолчанию", null)
@@ -232,30 +373,52 @@ class MainActivity : BaseActivity() {
 
     private fun showInstructions() {
         AlertDialog.Builder(this)
-            .setTitle("Как подключить Telegram")
+            .setTitle("Как использовать TG Clean")
             .setMessage(
-                "1. Выбери «Только Telegram».\n\n" +
-                "2. Нажми «Запустить».\n\n" +
-                "3. Нажми «Настроить Telegram» — TG Clean передаст Telegram SOCKS5 127.0.0.1:1082.\n\n" +
-                "4. В Telegram включи предложенный прокси. Логин и пароль не нужны.\n\n" +
-                "Если нужен обход для других приложений, переключись на «Системный VPN». Telegram-транспорт при этом остаётся отдельным."
+                "TG Auto — только Telegram через SOCKS5 127.0.0.1:1082, без Android VPN.\n\n" +
+                    "VPN — Telegram Auto + системный VPN с выбранной вручную DPI-стратегией.\n\n" +
+                    "Full Auto — сначала подбирает системную стратегию по YouTube/API, затем запускает VPN; Telegram подбирает свой маршрут независимо.\n\n" +
+                    "Для Telegram нажми «Настроить Telegram» и подтверди SOCKS5 127.0.0.1:1082. Логин и пароль пустые."
             )
             .setPositiveButton("Понятно", null)
             .show()
     }
 
     private fun showDiagnostics() {
+        val mode = productMode()
         val text = buildString {
             appendLine("TG Clean ${BuildConfig.VERSION_NAME}")
             appendLine("Статус: ${appStatus.first}")
-            appendLine("Режим: ${if (prefs.mode() == Mode.Proxy) "Telegram-only" else "System VPN"}")
+            appendLine("Режим: ${mode.key}")
+            appendLine("Сеть: ${TgCleanRuntime.networkType}")
             appendLine("SOCKS5: 127.0.0.1:1082")
             appendLine("TG runtime: ${TgCleanRuntime.running}")
-            appendLine("Последний маршрут: ${TgCleanRuntime.route}")
-            if (TgCleanRuntime.stats.isNotBlank()) appendLine("Статистика: ${TgCleanRuntime.stats}")
-            TgCleanRuntime.lastError?.let { appendLine("Ошибка: $it") }
-            if (prefs.mode() == Mode.VPN) appendLine("DPI: ${prefs.getCmdArgs()}")
-            appendLine("ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
+            appendLine("TG route id: ${TgCleanRuntime.route}")
+            appendLine("TG route: ${TgCleanRuntime.routeLabel}")
+            TgCleanRuntime.routeLatencyMs?.let { appendLine("TG latency: $it ms") }
+            if (TgCleanRuntime.tgProbePhase.isNotBlank()) {
+                appendLine("TG phase: ${TgCleanRuntime.tgProbePhase} ${TgCleanRuntime.tgProbeProgress}".trim())
+            }
+            if (TgCleanRuntime.probeSummary.isNotBlank()) {
+                appendLine()
+                appendLine("TG Auto probes:")
+                appendLine(TgCleanRuntime.probeSummary)
+            }
+            TgCleanRuntime.lastError?.let { appendLine("TG error: $it") }
+
+            if (mode != ProductMode.TELEGRAM || TgCleanRuntime.systemStrategyIndex != null) {
+                appendLine()
+                appendLine("System Auto: ${TgCleanRuntime.systemAutoPhase} ${TgCleanRuntime.systemAutoProgress}".trim())
+                TgCleanRuntime.systemStrategyIndex?.let { appendLine("System winner: #$it ${TgCleanRuntime.systemScore}") }
+                if (TgCleanRuntime.systemAutoSummary.isNotBlank()) {
+                    appendLine("System probes:")
+                    appendLine(TgCleanRuntime.systemAutoSummary)
+                }
+                TgCleanRuntime.systemAutoError?.let { appendLine("System error: $it") }
+                appendLine("System DPI: ${prefs.getCmdArgs()}")
+            }
+            if (TgCleanRuntime.stats.isNotBlank()) appendLine("TG stats: ${TgCleanRuntime.stats}")
+            appendLine("Device ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
         }
         AlertDialog.Builder(this)
             .setTitle("Диагностика")
@@ -263,5 +426,9 @@ class MainActivity : BaseActivity() {
             .setPositiveButton("Скопировать") { _, _ -> ClipboardUtils.copy(this, text, "TG Clean diagnostics") }
             .setNegativeButton("Закрыть", null)
             .show()
+    }
+
+    companion object {
+        private const val PREF_PRODUCT_MODE = "tgclean_product_mode"
     }
 }
