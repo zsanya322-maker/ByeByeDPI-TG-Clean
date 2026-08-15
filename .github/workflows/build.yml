@@ -1,0 +1,88 @@
+name: Build ARM64 test APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout TG Clean build scripts
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build components
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmake;3.22.1" \
+            "ndk;27.2.12479018"
+
+      - name: Checkout exact ByeByeDPI 1.7.8 source
+        shell: bash
+        run: |
+          git clone https://github.com/romanvht/ByeByeDPI.git upstream
+          cd upstream
+          git checkout --detach f2eb4a06ad918a34df66fc5b104377f21eb74039
+          git submodule update --init --recursive
+          test "$(git rev-parse HEAD)" = "f2eb4a06ad918a34df66fc5b104377f21eb74039"
+
+      - name: Pin NDK path
+        shell: bash
+        run: |
+          echo "ndk.dir=$ANDROID_SDK_ROOT/ndk/27.2.12479018" > upstream/local.properties
+
+      - name: Apply ByeByeDPI-TG-Clean patch
+        shell: bash
+        run: |
+          python3 tools/patch.py upstream
+          grep -R "io.github.zsanya322maker.byedpitgclean" upstream/app/build.gradle.kts
+          ! grep -R "X509TrustManager\|checkServerTrusted\|trustAll" upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
+
+      - name: Build debug-signed APK
+        working-directory: upstream
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Collect ARM64 APK and checksums
+        shell: bash
+        run: |
+          mkdir -p dist
+          APK="$(find upstream/app/build/outputs/apk -type f -name '*arm64-v8a*debug*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "ARM64 APK not found. Produced APKs:"
+            find upstream/app/build/outputs/apk -type f -name '*.apk' -print || true
+            exit 1
+          fi
+          cp "$APK" dist/ByeByeDPI-TG-Clean-v0.1.0-arm64-v8a-debug.apk
+          sha256sum dist/ByeByeDPI-TG-Clean-v0.1.0-arm64-v8a-debug.apk | tee dist/SHA256SUMS.txt
+          ls -lh dist/
+
+      - name: Upload ARM64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ByeByeDPI-TG-Clean-v0.1.0-arm64-v8a
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
