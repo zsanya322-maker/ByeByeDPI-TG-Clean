@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tgclean_bg">#F5F6FA</color>
+    <color name="tgclean_surface">#FFFFFFFF</color>
+    <color name="tgclean_text">#17181C</color>
+    <color name="tgclean_secondary">#666B75</color>
+    <color name="tgclean_outline">#E2E5EC</color>
+    <color name="tgclean_primary">#5865F2</color>
+    <color name="tgclean_green">#19A974</color>
+    <color name="tgclean_muted">#A4A8B1</color>
+</resources>
