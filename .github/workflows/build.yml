@@ -1,4 +1,4 @@
-name: Build ARM64 v0.1.1 hardened APK
+name: Build TG Clean v0.2.0 ARM64
 
 on:
   push:
@@ -51,18 +51,22 @@ jobs:
         run: |
           echo "ndk.dir=$ANDROID_SDK_ROOT/ndk/27.0.12077973" > upstream/local.properties
 
-      - name: Apply v0.1.1 security hardening
+      - name: Apply security base and v0.2.0 product overlay
         shell: bash
         run: |
+          set -euo pipefail
           python3 tools/patch_v011.py upstream
           python3 tools/patch_v011_final.py upstream
+          python3 tools/patch_v020.py upstream
+
           grep -F 'applicationId = "io.github.zsanya322maker.byedpitgclean"' upstream/app/build.gradle.kts
-          grep -F 'versionName = "1.7.8-tgclean-0.1.1"' upstream/app/build.gradle.kts
+          grep -F 'versionName = "2.0.0-tgclean"' upstream/app/build.gradle.kts
           grep -F 'APP_ABI := arm64-v8a' upstream/app/src/main/jni/Application.mk
           grep -F 'android:allowBackup="false"' upstream/app/src/main/AndroidManifest.xml
-          grep -F 'android.intent.category.LAUNCHER' upstream/app/src/main/AndroidManifest.xml
-          grep -F 'android.intent.category.LEANBACK_LAUNCHER' upstream/app/src/main/AndroidManifest.xml
-          ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE' upstream/app/src/main/AndroidManifest.xml
+          grep -F 'TG Clean' upstream/app/src/main/res/values/strings.xml
+          grep -F 'tg://socks?server=127.0.0.1&port=1082' upstream/app/src/main/java/io/github/romanvht/byedpi/activities/MainActivity.kt
+          grep -F 'TgCleanRuntime' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/TgCleanController.kt
+          ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|RECEIVE_BOOT_COMPLETED|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' upstream/app/src/main/AndroidManifest.xml
           ! grep -E 'X509TrustManager|checkServerTrusted|trustAll' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
           grep -F 'Server WebSocket frames must not be masked' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyRawWebSocket.kt
           grep -F 'blockedNonTelegram' upstream/app/src/main/java/io/github/romanvht/byedpi/ewenloy/tgws/EwenloyTgWsProxyServer.kt
@@ -84,39 +88,33 @@ jobs:
 
           DEBUG_APK="$(find upstream/app/build/outputs/apk -type f -name '*arm64-v8a*debug*.apk' | head -n 1)"
           RELEASE_APK="$(find upstream/app/build/outputs/apk -type f -name '*arm64-v8a*release*.apk' | head -n 1)"
-          if [ -z "$DEBUG_APK" ] || [ -z "$RELEASE_APK" ]; then
-            echo "Expected ARM64 APKs not found. Produced APKs:"
-            find upstream/app/build/outputs/apk -type f -name '*.apk' -print || true
-            exit 1
-          fi
+          test -n "$DEBUG_APK"
+          test -n "$RELEASE_APK"
 
-          cp "$DEBUG_APK" dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-debug.apk
-          "$BT/zipalign" -p -f 4 "$RELEASE_APK" dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-release-unsigned-aligned.apk
-          "$BT/zipalign" -c -p 4 dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-release-unsigned-aligned.apk
+          cp "$DEBUG_APK" dist/TG-Clean-v0.2.0-arm64-v8a-debug.apk
+          "$BT/zipalign" -p -f 4 "$RELEASE_APK" dist/TG-Clean-v0.2.0-arm64-v8a-release-unsigned-aligned.apk
+          "$BT/zipalign" -c -p 4 dist/TG-Clean-v0.2.0-arm64-v8a-release-unsigned-aligned.apk
 
-          "$BT/apksigner" verify --verbose --print-certs dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-debug.apk
-          "$BT/aapt" dump badging dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-debug.apk | tee dist/APK_BADGING.txt
-          "$BT/aapt" dump permissions dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-debug.apk | tee dist/APK_PERMISSIONS.txt
+          "$BT/apksigner" verify --verbose --print-certs dist/TG-Clean-v0.2.0-arm64-v8a-debug.apk
+          "$BT/aapt" dump badging dist/TG-Clean-v0.2.0-arm64-v8a-debug.apk | tee dist/APK_BADGING.txt
+          "$BT/aapt" dump permissions dist/TG-Clean-v0.2.0-arm64-v8a-debug.apk | tee dist/APK_PERMISSIONS.txt
 
           grep -F "package: name='io.github.zsanya322maker.byedpitgclean'" dist/APK_BADGING.txt
-          grep -F "versionName='1.7.8-tgclean-0.1.1'" dist/APK_BADGING.txt
-          ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE' dist/APK_PERMISSIONS.txt
+          grep -F "versionName='2.0.0-tgclean'" dist/APK_BADGING.txt
+          ! grep -E 'QUERY_ALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|RECEIVE_BOOT_COMPLETED|REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' dist/APK_PERMISSIONS.txt
 
-          unzip -l dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-debug.apk | tee dist/APK_CONTENTS.txt
+          unzip -l dist/TG-Clean-v0.2.0-arm64-v8a-debug.apk | tee dist/APK_CONTENTS.txt
           ! grep -E 'lib/(armeabi-v7a|x86|x86_64)/' dist/APK_CONTENTS.txt
           grep -F 'lib/arm64-v8a/libbyedpi.so' dist/APK_CONTENTS.txt
           grep -F 'lib/arm64-v8a/libhev-socks5-tunnel.so' dist/APK_CONTENTS.txt
 
-          sha256sum \
-            dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-debug.apk \
-            dist/ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a-release-unsigned-aligned.apk \
-            | tee dist/SHA256SUMS.txt
+          sha256sum dist/*.apk | tee dist/SHA256SUMS.txt
           ls -lh dist/
 
-      - name: Upload v0.1.1 audit artifact
+      - name: Upload v0.2.0 audit artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ByeByeDPI-TG-Clean-v0.1.1-arm64-v8a
+          name: TG-Clean-v0.2.0-arm64-v8a
           path: dist/
           if-no-files-found: error
           retention-days: 30
