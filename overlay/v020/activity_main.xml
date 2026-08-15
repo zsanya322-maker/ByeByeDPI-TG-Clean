@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/tgclean_bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TG Clean" android:textColor="@color/tgclean_text" android:textSize="30sp" android:textStyle="bold" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Telegram без лишних настроек" android:textColor="@color/tgclean_secondary" android:textSize="15sp" />
+
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp" app:cardBackgroundColor="@color/tgclean_surface" app:cardCornerRadius="24dp" app:cardElevation="0dp" app:strokeColor="@color/tgclean_outline" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                    <View android:id="@+id/status_dot" android:layout_width="12dp" android:layout_height="12dp" android:background="@drawable/tgclean_dot" />
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:id="@+id/status_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Остановлено" android:textColor="@color/tgclean_text" android:textSize="21sp" android:textStyle="bold" />
+                        <TextView android:id="@+id/status_subtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textColor="@color/tgclean_secondary" android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+                <com.google.android.material.button.MaterialButton android:id="@+id/power_button" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="18dp" android:text="Запустить" android:textAllCaps="false" android:textSize="16sp" app:backgroundTint="@color/tgclean_primary" app:cornerRadius="16dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="Режим" android:textColor="@color/tgclean_text" android:textSize="17sp" android:textStyle="bold" />
+        <com.google.android.material.button.MaterialButtonToggleGroup android:id="@+id/mode_toggle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" app:selectionRequired="true" app:singleSelection="true">
+            <com.google.android.material.button.MaterialButton android:id="@+id/mode_telegram" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:text="Только Telegram" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/mode_vpn" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:text="Системный VPN" android:textAllCaps="false" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+        <TextView android:id="@+id/mode_description" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:textColor="@color/tgclean_secondary" android:textSize="13sp" />
+
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" app:cardBackgroundColor="@color/tgclean_surface" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeColor="@color/tgclean_outline" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Telegram SOCKS5" android:textColor="@color/tgclean_text" android:textSize="17sp" android:textStyle="bold" />
+                <TextView android:id="@+id/tg_proxy_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="127.0.0.1:1082  •  остановлен" android:textColor="@color/tgclean_secondary" android:textIsSelectable="true" android:textSize="14sp" />
+                <TextView android:id="@+id/route_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Маршрут: —" android:textColor="@color/tgclean_secondary" android:textSize="13sp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:orientation="horizontal">
+                    <com.google.android.material.button.MaterialButton android:id="@+id/setup_telegram_button" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Настроить Telegram" android:textAllCaps="false" app:cornerRadius="14dp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/copy_proxy_button" style="?attr/materialButtonOutlinedStyle" android:layout_width="wrap_content" android:layout_height="48dp" android:layout_marginStart="8dp" android:text="Копировать" android:textAllCaps="false" app:cornerRadius="14dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView android:id="@+id/vpn_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:visibility="gone" app:cardBackgroundColor="@color/tgclean_surface" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeColor="@color/tgclean_outline" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Системный обход" android:textColor="@color/tgclean_text" android:textSize="17sp" android:textStyle="bold" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Эта часть использует ByeDPI. На разных сетях стратегия может отличаться; Telegram 1082 от неё не зависит." android:textColor="@color/tgclean_secondary" android:textSize="13sp" />
+                <TextView android:id="@+id/strategy_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/tgclean_code_bg" android:fontFamily="monospace" android:padding="12dp" android:textColor="@color/tgclean_text" android:textSize="12sp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/edit_strategy_button" style="?attr/materialButtonOutlinedStyle" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_marginTop="10dp" android:text="Изменить стратегию" android:textAllCaps="false" app:cornerRadius="13dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:orientation="horizontal">
+            <com.google.android.material.button.MaterialButton android:id="@+id/instructions_button" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="Инструкция" android:textAllCaps="false" app:cornerRadius="14dp" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/diagnostics_button" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:layout_weight="1" android:text="Диагностика" android:textAllCaps="false" app:cornerRadius="14dp" />
+        </LinearLayout>
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:gravity="center" android:text="Открытый исходный код • локальный прокси • без телеметрии" android:textColor="@color/tgclean_secondary" android:textSize="12sp" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
