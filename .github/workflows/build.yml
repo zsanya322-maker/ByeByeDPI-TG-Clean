@@ -78,8 +78,18 @@ jobs:
         working-directory: upstream
         shell: bash
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease --stacktrace
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease --stacktrace 2>&1 | tee ../gradle-build.log
+
+      - name: Upload Gradle build log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: TG-Clean-v0.2.0-gradle-build-log
+          path: gradle-build.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Audit and collect ARM64 APKs
         shell: bash
